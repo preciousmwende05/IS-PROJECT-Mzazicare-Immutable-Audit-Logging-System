@@ -1,0 +1,22 @@
+.github/prompts/
+node_modules/
+dist/
+
+# Secrets: never commit real environment files (templates are fine)
+.env
+.env.*
+!.env.example
+
+# Python
+Audit.venv/
+.venv/
+__pycache__/
+*.pyc
+
+# ML: generated data, models and run outputs (rebuild with simulate.py / train.py)
+ml/audit-anomaly/data/
+ml/audit-anomaly/models/
+ml/audit-anomaly/runs/
+
+# Editors / OS
+.DS_Store

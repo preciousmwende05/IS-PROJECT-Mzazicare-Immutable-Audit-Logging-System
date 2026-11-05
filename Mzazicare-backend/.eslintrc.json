@@ -1,0 +1,33 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" },
+  "plugins": ["@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  "env": { "node": true, "es2022": true },
+  "ignorePatterns": ["dist/", "node_modules/"],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "no-console": "warn",
+    "eqeqeq": ["error", "smart"],
+
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["@/modules/*/repository/*", "@/modules/*/models/*"],
+            "message": "Do not reach into another module's data layer. React to its events, or ask its team to expose a service method."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/modules/*/**"],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
+}

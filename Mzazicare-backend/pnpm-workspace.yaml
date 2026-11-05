@@ -1,0 +1,9 @@
+# pnpm settings live here from pnpm 10 onwards, not in package.json.
+#
+# pnpm refuses to run a dependency's install scripts unless it is allowed
+# below — a supply-chain guard. These two need it:
+#   esbuild           the compiler behind tsx (pnpm dev)
+#   msgpackr-extract  bullmq's optional native serialisation speedup
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true

@@ -1,0 +1,22 @@
+# Development image — hot reload via tsx, source bind-mounted from the host.
+# Used by the `api` service in docker-compose.yml.
+#
+# node_modules stays inside the container (an anonymous volume in compose), so
+# the host's macOS/Linux binaries never leak into the container's Alpine ones.
+FROM node:22-alpine
+
+ENV PNPM_HOME=/pnpm
+ENV PATH="$PNPM_HOME:$PATH"
+ENV NODE_ENV=development
+RUN corepack enable
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+EXPOSE 4000
+
+CMD ["pnpm", "run", "dev"]

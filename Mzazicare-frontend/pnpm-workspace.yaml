@@ -1,0 +1,4 @@
+# Standalone pnpm project (not part of the backend workspace).
+# esbuild (used by Vite) needs its install script to fetch its binary.
+allowBuilds:
+  esbuild: true
