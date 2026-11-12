@@ -28,6 +28,8 @@ COPY tsconfig.json ./
 COPY src ./src
 
 # tsc emits to dist/, then tsc-alias rewrites the @/ paths to relative ones.
+# A small server (1 GB) needs a larger heap for tsc; swap provides the room.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN pnpm run build
 
 # ── production dependencies only ─────────────────────────────────────────────
