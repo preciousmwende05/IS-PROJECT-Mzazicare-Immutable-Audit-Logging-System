@@ -1,0 +1,10 @@
+# MzaziCare scheduled jobs (server time = Africa/Nairobi).
+# Install as the app user:   crontab /opt/mzazicare/deploy/crontab.txt
+# Check:                     crontab -l
+# Logs:                      /opt/mzazicare/logs/
+
+# Nightly backup at 02:00: database (incl. the audit chain) + uploaded files.
+0 2 * * * mkdir -p /opt/mzazicare/logs && bash /opt/mzazicare/deploy/scripts/backup.sh >> /opt/mzazicare/logs/backup.log 2>&1
+
+# Hourly at :05, anomaly model alerts for admins and auditors.
+5 * * * * mkdir -p /opt/mzazicare/logs && bash /opt/mzazicare/deploy/scripts/ml-alert.sh >> /opt/mzazicare/logs/ml-alert.log 2>&1

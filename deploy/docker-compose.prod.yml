@@ -1,0 +1,116 @@
+# MzaziCare — production stack (one server).
+#
+#   cd deploy
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# What runs here:
+#   caddy   HTTPS for api.<domain> and files.<domain> (free certificates, auto-renewed)
+#   api     the compiled backend (Mzazicare-backend/Dockerfile, NOT Dockerfile.dev)
+#   redis   job queues + cache, password-protected, never exposed to the internet
+#   rustfs  file storage (KYC documents), reachable only through Caddy
+#
+# MongoDB is NOT here: it runs on MongoDB Atlas (managed, backed up separately).
+# The frontend is NOT here: it runs on Vercel.
+#
+# All settings come from deploy/.env (copy .env.example, fill it in). Only
+# ports 80 and 443 are open to the world; everything else stays internal.
+
+name: mzazicare
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+      FILES_DOMAIN: ${FILES_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *logging
+
+  api:
+    build:
+      context: ../Mzazicare-backend
+      dockerfile: Dockerfile
+    image: mzazicare-api:latest
+    restart: always
+    init: true
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      # Inside this network services are reached by name.
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      RUSTFS_ENDPOINT: rustfs
+      RUSTFS_PORT: "9000"
+      RUSTFS_USE_SSL: "false"
+    expose:
+      - "4000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    # appendonly: queued jobs survive a restart.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    logging: *logging
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    restart: always
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      # The web console stays off in production.
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_REGION: ${RUSTFS_REGION:-us-east-1}
+      # The web app (Vercel) uploads KYC files straight to RustFS through Caddy.
+      RUSTFS_CORS_ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    logging: *logging
+
+volumes:
+  caddy-data:
+  caddy-config:
+  redis-data:
+  rustfs-data:

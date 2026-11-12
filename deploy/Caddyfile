@@ -1,0 +1,25 @@
+# HTTPS for MzaziCare. Caddy gets and renews free Let's Encrypt certificates
+# by itself, as long as both domains point at this server (DNS A records).
+
+{
+	email {$ACME_EMAIL}
+}
+
+# The API, e.g. api.mzazicare.me
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:4000
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+# File storage, e.g. files.mzazicare.me. Only signed, short-lived links work:
+# the API signs each link for this host name (RUSTFS_PUBLIC_URL).
+{$FILES_DOMAIN} {
+	reverse_proxy rustfs:9000
+	header -Server
+}
