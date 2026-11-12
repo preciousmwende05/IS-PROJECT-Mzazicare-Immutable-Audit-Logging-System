@@ -37,9 +37,11 @@ import {
   UnauthorizedError,
 } from "@/shared/errors";
 import { cutOffAccessTokens } from "@/shared/middleware/auth.middleware";
-import { smsQueue } from "@/shared/queues";
+import { emailQueue, smsQueue } from "@/shared/queues";
+import { smsConfigured } from "@/shared/services/sms.service";
 import { addMinutes } from "@/shared/utils/date.util";
 import { authRepository } from "@/modules/auth-service/repository/auth.repository";
+import { otpChannels, otpEmail } from "@/modules/auth-service/services/otp.delivery";
 import { tokenService, type TokenPair } from "@/modules/auth-service/services/token.service";
 import {
   type OtpPurpose,
@@ -103,10 +105,12 @@ const otpMessage = (purpose: OtpPurpose, code: string): string =>
  *   1. generateOtp() produces the plaintext + hash.
  *   2. authRepository.createOtp persists ONLY the hash, with an expiresAt 10
  *      minutes in the future and attempts = 0.
- *   3. We enqueue an SMS job carrying the PLAINTEXT code. Note the queue: the
- *      actual SMS sending is slow, external work owned by notification-service
- *      (U-CS 76) — we never block the request on it. If the queue is down the
- *      code still exists and can be re-sent via /resend-otp.
+ *   3. We enqueue delivery jobs carrying the PLAINTEXT code: an email when the
+ *      account has an address, and an SMS when a provider is configured (or as
+ *      the fallback for accounts without email). See otpChannels(). Sending is
+ *      slow, external work done by the notification workers; we never block
+ *      the request on it. If a queue is down the code still exists and can be
+ *      re-sent via /resend-otp.
  */
 const issueOtp = async (user: User, purpose: OtpPurpose): Promise<void> => {
   const { code, codeHash } = generateOtp();
@@ -117,8 +121,14 @@ const issueOtp = async (user: User, purpose: OtpPurpose): Promise<void> => {
     expiresAt: addMinutes(new Date(), OTP_TTL_MINUTES),
     attempts: 0,
   });
-  // Slow, external work — the SMS worker (U-CS 76) drains this queue.
-  await smsQueue.add("send-otp", { to: user.phone, purpose, body: otpMessage(purpose, code) });
+  // Slow, external work: the notification workers drain these queues.
+  for (const channel of otpChannels(user, smsConfigured)) {
+    if (channel === "email" && user.email) {
+      await emailQueue.add("send-otp", { to: user.email, ...otpEmail(purpose, code, OTP_TTL_MINUTES, user.name) });
+    } else {
+      await smsQueue.add("send-otp", { to: user.phone, purpose, body: otpMessage(purpose, code) });
+    }
+  }
 };
 
 /**
@@ -167,7 +177,7 @@ const recordFailedLogin = async (user: User): Promise<void> => {
 // Typed inputs — the controller hands these to the service. They are plain
 // values (no req/res), which is what keeps the service callable from anywhere.
 // ---------------------------------------------------------------------------
-export type RegisterInput = { phone: string; name: string; password: string; role: UserRole };
+export type RegisterInput = { phone: string; name: string; email?: string; password: string; role: UserRole };
 export type LoginInput = { phone: string; password: string };
 export type ListUsersQuery = { role?: UserRole; status?: UserStatus; q?: string; page: number; limit: number };
 export type UpdateMeInput = { name?: string; email?: string };
@@ -188,18 +198,22 @@ export const authService = {
    *   3. Persist the user with status "pending_verification". Crucially NO
    *      tokens are issued yet — the account is not trusted until the phone
    *      is proven.
-   *   4. Send the OTP by SMS (issueOtp).
+   *   4. Send the OTP by email and/or SMS (issueOtp).
    *   5. Return the user; the controller serializes it with 201.
    */
   register: async (input: RegisterInput): Promise<User> => {
     if (await authRepository.findByPhone(input.phone)) {
       throw new ConflictError("This phone number is already registered");
     }
+    if (input.email && (await authRepository.findByEmail(input.email))) {
+      throw new ConflictError("This email is already registered");
+    }
 
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_COST);
     const user = await authRepository.create({
       phone: input.phone,
       name: input.name,
+      ...(input.email ? { email: input.email } : {}),
       passwordHash,
       role: input.role,
       status: "pending_verification",
@@ -566,4 +580,4 @@ export const authService = {
     }
     return user;
   },
-};
+};

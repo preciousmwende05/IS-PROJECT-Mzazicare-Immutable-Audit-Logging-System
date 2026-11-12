@@ -11,6 +11,12 @@ const schema = z.object({
   PORT: z.coerce.number().default(4000),
   API_PREFIX: z.string().default("/v1"),
   ALLOWED_ORIGINS: z.string().default("http://localhost:3000"),
+  // How many reverse proxies (Caddy, a load balancer) sit in front of the API.
+  // Express then reads the real client address from X-Forwarded-For, which the
+  // rate limits and the audit log's `ip` field depend on. Leave it unset to get
+  // 1 in production (Caddy) and 0 elsewhere. Never set it higher than the real
+  // number of proxies: a client could then forge its own address.
+  TRUST_PROXY: z.coerce.number().int().min(0).optional(),
 
   MONGODB_URI: z.string().min(1),
 
@@ -47,7 +53,10 @@ const schema = z.object({
   SMS_API_KEY: z.string().optional(),
   SMS_USERNAME: z.string().optional(),
   SMS_SENDER_ID: z.string().optional(),
+  // Any SMTP provider (Gmail app password, Brevo, ...). Verification codes are
+  // emailed when set; blank logs them instead (development).
   SMTP_URL: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
   MPESA_CONSUMER_KEY: z.string().optional(),
   MPESA_CONSUMER_SECRET: z.string().optional(),
   MPESA_SHORTCODE: z.string().optional(),
@@ -65,4 +74,5 @@ if (!parsed.success) {
 export const env = {
   ...parsed.data,
   allowedOrigins: parsed.data.ALLOWED_ORIGINS.split(",").map((s) => s.trim()),
-};
+  trustProxy: parsed.data.TRUST_PROXY ?? (parsed.data.NODE_ENV === "production" ? 1 : 0),
+};

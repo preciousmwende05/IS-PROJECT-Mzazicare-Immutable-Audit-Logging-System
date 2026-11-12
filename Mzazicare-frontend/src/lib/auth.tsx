@@ -8,7 +8,7 @@ type AuthState = {
   user: User | null;
   ready: boolean;
   login: (phone: string, password: string) => Promise<User>;
-  register: (input: { name: string; phone: string; password: string; role: "family" | "caregiver" }) => Promise<User>;
+  register: (input: { name: string; phone: string; email: string; password: string; role: "family" | "caregiver" }) => Promise<User>;
   verifyPhone: (phone: string, code: string) => Promise<User>;
   resendCode: (phone: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -80,4 +80,4 @@ export const useAuth = (): AuthState => {
 
 /** Where each role lands after signing in. */
 export const homeFor = (role: string): string =>
-  ({ admin: "/users", coordinator: "/visits", auditor: "/audit" })[role] ?? "/elders";
+  ({ admin: "/users", coordinator: "/visits", auditor: "/audit", caregiver: "/caregiver-profile" })[role] ?? "/elders";

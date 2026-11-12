@@ -65,6 +65,9 @@ export const authValidation = {
     body: z.object({
       phone: phoneField,
       name: z.string().min(1, "Name is required").max(120),
+      // Where the verification code is emailed. Optional for the API (SMS still
+      // works when configured); the web app asks for it.
+      email: z.string().trim().toLowerCase().email("Enter a valid email address").optional(),
       password,
       role: z.enum(["family", "elder", "caregiver"]).default("family"),
     }),
@@ -178,4 +181,4 @@ export const authValidation = {
     params: z.object({ id: objectId }),
     body: z.object({ role: z.enum(USER_ROLES) }),
   }),
-};
+};

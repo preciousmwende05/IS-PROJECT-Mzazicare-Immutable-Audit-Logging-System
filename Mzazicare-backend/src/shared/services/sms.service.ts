@@ -44,5 +44,7 @@ const africasTalkingSms: SmsService = {
   },
 };
 
+export const smsConfigured = Boolean(env.SMS_API_KEY && env.SMS_USERNAME);
+
 export const smsService: SmsService =
   env.SMS_API_KEY && env.SMS_USERNAME ? africasTalkingSms : consoleSms;

@@ -7,6 +7,7 @@ import { Worker, type Job } from "bullmq";
 
 import logger from "@/shared/config/logger";
 import { redisConnection } from "@/shared/queues/connection";
+import { emailService, type EmailMessage } from "@/shared/services/email.service";
 import { smsService } from "@/shared/services/sms.service";
 import { intakeService } from "@/modules/notification-service/services/intake.service";
 import { DELIVERY_QUEUE } from "@/modules/notification-service/services/notification.queues";
@@ -58,6 +59,18 @@ export function startNotificationWorker() {
     logger.error(`[notification] sms ${job?.name} (job ${job?.id}) failed: ${err.message}`),
   );
 
-  logger.info("[notification] workers started: intake, delivery, sms");
-  return { intake, delivery, sms };
+  // Verification and password-reset codes sent by email (auth-service).
+  const email = new Worker<EmailMessage>(
+    "email",
+    async (job) => {
+      await emailService.send(job.data);
+    },
+    { connection: redisConnection, concurrency: 5 },
+  );
+  email.on("failed", (job, err) =>
+    logger.error(`[notification] email ${job?.name} (job ${job?.id}) failed: ${err.message}`),
+  );
+
+  logger.info("[notification] workers started: intake, delivery, sms, email");
+  return { intake, delivery, sms, email };
 }

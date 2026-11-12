@@ -29,6 +29,11 @@ const isAllowedOrigin = (origin: string) =>
 
 const app = express();
 
+// Behind Caddy every request arrives from the proxy's address. Without this the
+// rate limiter would lock out all users at once and the audit log would record
+// the same IP for everyone. See TRUST_PROXY in shared/config/env.ts.
+app.set("trust proxy", env.trustProxy);
+
 app.use(helmet());
 app.use(
   cors({

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Eye, EyeOff, HandHeart, Heart, Phone } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, HandHeart, Heart, Mail, Phone } from "lucide-react";
 
 import { AuthLayout } from "@/components/AuthLayout";
 import { Banner, Field } from "@/components/ui";
@@ -9,12 +9,13 @@ import { useAuth } from "@/lib/auth";
 
 type JoinAs = "family" | "caregiver";
 
-/** Page 2 — Register (step 1 of 2). The backend then sends a 6-digit code by SMS. */
+/** Page 2 — Register (step 1 of 2). The backend then emails a 6-digit code (and texts it when SMS is set up). */
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [role, setRole] = useState<JoinAs>("family");
@@ -27,8 +28,8 @@ export default function Register() {
     setBusy(true);
     setError(null);
     try {
-      const user = await register({ name: name.trim(), phone: phone.trim(), password, role });
-      navigate("/verify", { state: { phone: user.phone, name: user.name } });
+      const user = await register({ name: name.trim(), phone: phone.trim(), email: email.trim(), password, role });
+      navigate("/verify", { state: { phone: user.phone, name: user.name, email: user.email ?? email.trim() } });
     } catch (err) {
       setError(err);
     } finally {
@@ -53,7 +54,13 @@ export default function Register() {
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Wanjiru Kamau" autoComplete="name" required />
           </div>
         </Field>
-        <Field label="Phone number" hint="We'll send a verification code to this number.">
+        <Field label="Email address" hint="We'll email you a 6-digit code to verify your account.">
+          <div className="input">
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. wanjiru@gmail.com" autoComplete="email" required />
+            <span className="icon"><Mail size={16} /></span>
+          </div>
+        </Field>
+        <Field label="Phone number" hint="You'll sign in with this number.">
           <div className="input">
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0712 345 678" autoComplete="tel" required />
             <span className="icon"><Phone size={16} /></span>
@@ -99,7 +106,7 @@ export default function Register() {
         </label>
 
         <button className="btn btn-gold" disabled={busy || !agree}>
-          <ArrowRight size={16} /> {busy ? "Creating account…" : "Create account & verify phone"}
+          <ArrowRight size={16} /> {busy ? "Creating account…" : "Create account & verify"}
         </button>
       </form>
 

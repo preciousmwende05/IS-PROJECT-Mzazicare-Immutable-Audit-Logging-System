@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Smartphone } from "lucide-react";
+import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
 
 import { AuthLayout } from "@/components/AuthLayout";
 import { Banner, Field } from "@/components/ui";
@@ -10,11 +10,11 @@ import { formatPhone } from "@/lib/kenya";
 
 const CODE_TTL_SECONDS = 10 * 60; // backend OTP_TTL_MINUTES
 
-/** Page 3 — Verify phone (step 2 of 2). Redeems the SMS code; the backend then signs you in. */
+/** Page 3 — Verify (step 2 of 2). Redeems the emailed code; the backend then signs you in. */
 export default function Verify() {
   const { verifyPhone, resendCode } = useAuth();
   const navigate = useNavigate();
-  const state = (useLocation().state ?? {}) as { phone?: string; name?: string };
+  const state = (useLocation().state ?? {}) as { phone?: string; name?: string; email?: string };
 
   const [phone, setPhone] = useState(state.phone ?? "");
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
@@ -104,12 +104,13 @@ export default function Verify() {
       }
     >
       <div className="icon-tile">
-        <Smartphone size={24} />
+        <Mail size={24} />
       </div>
-      <h2>Verify your phone</h2>
+      <h2>Verify your account</h2>
       <p className="sub">
         {state.name ? `Habari ${state.name.split(" ")[0]}, enter` : "Enter"} the 6-digit code we sent to{" "}
-        <b>{formatPhone(phone) || "your phone"}</b>.
+        <b>{state.email || "your email"}</b>. It can take a minute; check your spam folder too.
+        {phone && <> Your account: <b>{formatPhone(phone)}</b>.</>}
       </p>
 
       {!state.phone && (
