@@ -1,0 +1,177 @@
+# Runs on every push and pull request. Each job keeps its results as an
+# artifact named after the commit, so the evidence for any commit can be
+# downloaded later from the Actions tab (kept for 90 days).
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # package.json promises Node 20 or newer; 22.11 is an older 22 that
+        # cannot require() ES modules, the case that broke on Windows.
+        node: ["20", "22.11", "22"]
+    defaults:
+      run:
+        working-directory: Mzazicare-backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: Mzazicare-backend/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Unit tests (audit chain, append-only store, access control)
+        run: pnpm test
+        env:
+          CI: "true"
+
+      - name: Build production bundle
+        run: pnpm run build
+
+      - name: Test summary
+        if: always()
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET, pathlib
+          p = pathlib.Path("test-results/junit.xml")
+          if not p.exists():
+              print("No test results were produced.")
+              raise SystemExit
+          root = ET.parse(p).getroot()
+          suites = root.findall(".//testsuite")
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          failed = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+          skipped = sum(int(s.get("skipped", 0)) for s in suites)
+          print(f"### Backend tests: {total - failed - skipped} passed, {failed} failed, {skipped} skipped\n")
+          print("| Test file | Tests | Failed |\n|---|---|---|")
+          for s in suites:
+              f = int(s.get("failures", 0)) + int(s.get("errors", 0))
+              print(f"| {s.get('name')} | {s.get('tests')} | {f} |")
+          EOF
+
+      - name: Keep test results for this commit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results-node${{ matrix.node }}-${{ github.sha }}
+          path: Mzazicare-backend/test-results/
+          retention-days: 90
+
+  frontend:
+    name: Frontend (typecheck and build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Mzazicare-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: Mzazicare-frontend/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck and build
+        run: pnpm run build
+
+  ml:
+    name: Anomaly model (reproducible run and quality gate)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml/audit-anomaly
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml/audit-anomaly/requirements.txt
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      # Same seeded pipeline as the recorded sim-v3 run: simulate the audit
+      # log, build windows, train on the oldest weeks, pick the threshold on
+      # validation, evaluate once on the held-out test week.
+      - name: Simulate audit events
+        run: python src/simulate.py
+
+      - name: Build feature windows
+        run: python src/features.py
+
+      - name: Train
+        run: python src/train.py --tag ci
+
+      - name: Evaluate
+        run: |
+          RUN=$(ls runs | sort | tail -n 1)
+          echo "RUN=$RUN" >> "$GITHUB_ENV"
+          python src/evaluate.py --run "$RUN"
+
+      - name: Quality gate
+        run: python src/check_metrics.py --run "$RUN"
+
+      - name: Metrics summary
+        if: always()
+        run: |
+          [ -n "$RUN" ] && [ -f "runs/$RUN/metrics.json" ] || exit 0
+          python3 - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          m = json.load(open(f"runs/{os.environ['RUN']}/metrics.json"))
+          print(f"### Anomaly model, run `{m['run_id']}`\n")
+          print("| Detector | Precision | Recall | F1 | PR-AUC |\n|---|---|---|---|---|")
+          for k in ("baseline", "iforest", "hybrid"):
+              d = m[k]
+              print(f"| {k} | {d['precision']:.3f} | {d['recall']:.3f} | {d['f1']:.3f} | {d['pr_auc']:.3f} |")
+          EOF
+
+      - name: Keep run evidence for this commit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-run-${{ github.sha }}
+          path: |
+            ml/audit-anomaly/runs/
+            !ml/audit-anomaly/runs/**/*.joblib
+          retention-days: 90

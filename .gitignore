@@ -7,6 +7,9 @@ dist/
 .env.*
 !.env.example
 
+# Test reports (CI uploads them as artifacts)
+test-results/
+
 # Python
 Audit.venv/
 .venv/
@@ -20,3 +23,6 @@ ml/audit-anomaly/runs/
 
 # Editors / OS
 .DS_Store
+
+# TypeScript incremental build cache
+*.tsbuildinfo
