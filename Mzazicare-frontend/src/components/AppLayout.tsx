@@ -9,9 +9,11 @@ import {
   FileLock2,
   Heart,
   HelpCircle,
+  IdCard,
   ListChecks,
   Lock,
   ShieldCheck,
+  UserCheck,
   UserPlus,
   Users,
   type LucideIcon,
@@ -30,7 +32,15 @@ const ALL: Role[] = ["family", "elder", "caregiver", "coordinator", "admin", "au
 
 /** Who may open what. A locked item is shown greyed with a padlock, as in the design. */
 export const NAV: NavGroup[] = [
-  { label: "Accounts & access", crumb: "Accounts & access", items: [{ to: "/users", label: "Users", icon: Users, roles: ["admin"] }] },
+  {
+    label: "Accounts & access",
+    crumb: "Accounts & access",
+    items: [
+      { to: "/users", label: "Users", icon: Users, roles: ["admin"] },
+      { to: "/caregivers", label: "Caregiver applications", icon: UserCheck, roles: ["coordinator", "admin"] },
+      { to: "/caregiver-profile", label: "My caregiver profile", icon: IdCard, roles: ["caregiver"] },
+    ],
+  },
   {
     label: "Elder records",
     crumb: "Elder records",

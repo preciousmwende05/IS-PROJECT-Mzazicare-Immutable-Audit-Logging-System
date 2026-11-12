@@ -82,7 +82,52 @@ export type Visit = {
   checkedOutAt?: string | null;
 };
 
-export type Caregiver = { id: string; userId: string; status: string; skills: string[]; fullName?: string; name?: string };
+export type CaregiverStatus = "draft" | "submitted" | "under_review" | "more_info" | "approved" | "rejected" | "suspended" | "expired";
+export type KycDocType = "national_id" | "certificate" | "good_conduct" | "reference";
+
+export type KycDocument = {
+  id: string;
+  type: KycDocType;
+  status: "pending" | "verified" | "rejected";
+  originalName: string;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  reviewNote: string | null;
+  uploadedAt: string | null;
+};
+
+/** The caregiver's own profile (GET /caregivers/me). */
+export type CaregiverProfile = {
+  id: string;
+  bio: string;
+  skills: string[];
+  yearsExperience: number;
+  serviceAreas: string[];
+  hourlyRateCents: number;
+  status: CaregiverStatus;
+  baseLocation: { coordinates: number[] };
+  rejectionReason: string | null;
+  suspendedReason: string | null;
+  infoRequest: string | null;
+  canReapplyAt: string | null;
+  documents: KycDocument[];
+};
+
+/** Coordinator / admin view of an application (GET /caregivers, /caregivers/:id). */
+export type Caregiver = CaregiverProfile & {
+  userId: string;
+  fullName?: string | null;
+  name?: string;
+  reviewerId: string | null;
+  approvedAt: string | null;
+  rejectedAt: string | null;
+  noShowCount: number;
+  flaggedForReview: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type UploadUrl = { key: string; url: string; method: "PUT"; headers: Record<string, string>; maxBytes: number; expiresInSeconds: number };
 
 export type CareLog = {
   id: string;

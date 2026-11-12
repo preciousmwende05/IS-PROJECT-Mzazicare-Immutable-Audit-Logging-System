@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 
 import { asyncHandler } from "@/shared/utils/async.util";
+import { authService } from "@/modules/auth-service/services/auth.service";
 import { created, ok, paginated } from "@/shared/utils/response.util";
 import { caregiverService } from "@/modules/caregiver-service/services/caregiver.service";
 import type { SearchQuery } from "@/modules/caregiver-service/validation/caregiver.validation";
@@ -11,10 +12,29 @@ import {
   serializePublicCaregiver,
   serializeSlot,
 } from "@/modules/caregiver-service/views/caregiver.view";
-import type { CaregiverStatus } from "@/modules/caregiver-service/models/caregiver.model";
+import type {
+  Caregiver,
+  CaregiverStatus,
+  KycDocument,
+} from "@/modules/caregiver-service/models/caregiver.model";
 
 const userId = (req: Request) => req.user!.id;
 const param = (req: Request, name: string) => String(req.params[name]);
+
+/**
+ * The coordinator/admin view plus the applicant's name, so reviewers (and the
+ * visit assignment list) see "Mercy Chebet", not an id. Names come from
+ * auth-service in one batched lookup per response.
+ */
+const withNames = async (rows: Array<{ caregiver: Caregiver; documents?: KycDocument[] }>) => {
+  const names = await authService.getDisplayNames(rows.map((r) => String(r.caregiver.userId)));
+  return rows.map(({ caregiver, documents }) => ({
+    ...serializeAdminCaregiver(caregiver, documents),
+    fullName: names.get(String(caregiver.userId))?.name ?? null,
+  }));
+};
+const adminView = async (caregiver: Caregiver, documents: KycDocument[]) =>
+  (await withNames([{ caregiver, documents }]))[0];
 
 export const caregiverController = {
   /* ---------- caregiver ---------- */
@@ -81,7 +101,7 @@ export const caregiverController = {
       { status: req.query.status as CaregiverStatus | undefined, flagged: req.query.flagged === "true" },
       req.query,
     );
-    return paginated(res, { ...page, items: page.items.map((c) => serializeAdminCaregiver(c)) });
+    return paginated(res, { ...page, items: await withNames(page.items.map((caregiver) => ({ caregiver }))) });
   }),
 
   // validate() has already replaced req.query with the parsed result, so it is NOT parsed again here.
@@ -102,7 +122,7 @@ export const caregiverController = {
 
   getApplication: asyncHandler(async (req: Request, res: Response) => {
     const { caregiver, documents } = await caregiverService.getApplication(param(req, "id"));
-    return ok(res, serializeAdminCaregiver(caregiver, documents));
+    return ok(res, await adminView(caregiver, documents));
   }),
 
   getDocumentUrl: asyncHandler(async (req: Request, res: Response) => {
@@ -112,7 +132,7 @@ export const caregiverController = {
 
   startReview: asyncHandler(async (req: Request, res: Response) => {
     const { caregiver, documents } = await caregiverService.startReview(param(req, "id"), userId(req));
-    return ok(res, serializeAdminCaregiver(caregiver, documents));
+    return ok(res, await adminView(caregiver, documents));
   }),
 
   reviewDocument: asyncHandler(async (req: Request, res: Response) => {
@@ -122,33 +142,33 @@ export const caregiverController = {
       userId(req),
       req.body,
     );
-    return ok(res, serializeAdminCaregiver(caregiver, documents));
+    return ok(res, await adminView(caregiver, documents));
   }),
 
   approve: asyncHandler(async (req: Request, res: Response) => {
     const { caregiver, documents } = await caregiverService.approve(param(req, "id"), userId(req));
-    return ok(res, serializeAdminCaregiver(caregiver, documents));
+    return ok(res, await adminView(caregiver, documents));
   }),
 
   reject: asyncHandler(async (req: Request, res: Response) => {
     const { caregiver, documents } = await caregiverService.reject(param(req, "id"), req.body.reason);
-    return ok(res, serializeAdminCaregiver(caregiver, documents));
+    return ok(res, await adminView(caregiver, documents));
   }),
 
   requestInfo: asyncHandler(async (req: Request, res: Response) => {
     const { caregiver, documents } = await caregiverService.requestInfo(param(req, "id"), req.body.note);
-    return ok(res, serializeAdminCaregiver(caregiver, documents));
+    return ok(res, await adminView(caregiver, documents));
   }),
 
   /* ---------- admin ---------- */
 
   suspend: asyncHandler(async (req: Request, res: Response) => {
     const { caregiver, documents } = await caregiverService.suspend(param(req, "id"), req.body.reason);
-    return ok(res, serializeAdminCaregiver(caregiver, documents));
+    return ok(res, await adminView(caregiver, documents));
   }),
 
   reinstate: asyncHandler(async (req: Request, res: Response) => {
     const { caregiver, documents } = await caregiverService.reinstate(param(req, "id"), userId(req));
-    return ok(res, serializeAdminCaregiver(caregiver, documents));
+    return ok(res, await adminView(caregiver, documents));
   }),
-};
+};

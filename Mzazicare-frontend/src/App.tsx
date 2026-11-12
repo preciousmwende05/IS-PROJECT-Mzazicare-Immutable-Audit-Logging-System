@@ -5,6 +5,9 @@ import { AppLayout } from "@/components/AppLayout";
 import type { Role } from "@/lib/api";
 import { homeFor, useAuth } from "@/lib/auth";
 import Audit from "@/pages/Audit";
+import CaregiverProfile from "@/pages/CaregiverProfile";
+import CaregiverReview from "@/pages/CaregiverReview";
+import Caregivers from "@/pages/Caregivers";
 import DataRequests from "@/pages/DataRequests";
 import ElderForm from "@/pages/ElderForm";
 import ElderRecord from "@/pages/ElderRecord";
@@ -47,6 +50,9 @@ export default function App() {
 
       <Route element={<Guard><AppLayout /></Guard>}>
         <Route path="/users" element={<Guard roles={["admin"]}><Users /></Guard>} />
+        <Route path="/caregivers" element={<Guard roles={["coordinator", "admin"]}><Caregivers /></Guard>} />
+        <Route path="/caregivers/:id" element={<Guard roles={["coordinator", "admin"]}><CaregiverReview /></Guard>} />
+        <Route path="/caregiver-profile" element={<Guard roles={["caregiver"]}><CaregiverProfile /></Guard>} />
         <Route path="/elders" element={<Guard roles={CARE}><Elders /></Guard>} />
         <Route path="/elders/new" element={<Guard roles={["family"]}><ElderForm /></Guard>} />
         <Route path="/elders/:id" element={<Guard roles={CARE}><ElderRecord /></Guard>} />
