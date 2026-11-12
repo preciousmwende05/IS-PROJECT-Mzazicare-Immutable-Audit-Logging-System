@@ -113,7 +113,12 @@ pnpm install
 cp .env.example .env   # fill in the two JWT secrets
 pnpm infra:up          # full stack: MongoDB + Redis + RustFS + the API
 pnpm dev               # http://localhost:4000/v1/health
+pnpm test              # unit tests, no database needed
 ```
+
+Every push runs `.github/workflows/ci.yml`: backend typecheck, lint, tests and
+build, the frontend build, and a seeded run of the anomaly model with a quality
+gate. Results for each commit are kept under the Actions tab.
 
 The frontend is not scaffolded yet; when it lands it will live in
 `Mzazicare-frontend/` and talk to the API through the `/v1` prefix.
@@ -125,4 +130,4 @@ The frontend is not scaffolded yet; when it lands it will live in
 - [`Mzazicare-backend/docs/ARCHITECTURE.md`](Mzazicare-backend/docs/ARCHITECTURE.md)
   — the layers, the module map, events vs queues, and the module-interaction rules.
 - [`Mzazicare-backend/docs/MODULE_GUIDE.md`](Mzazicare-backend/docs/MODULE_GUIDE.md)
-  — a complete worked module, file by file, plus the PR checklist.
+  — a complete worked module, file by file, plus the PR checklist.

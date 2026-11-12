@@ -120,9 +120,9 @@ Catalog was the only one blocking your spec, and it is now built.
 
 ## Production readiness (needed regardless of features)
 
-- ❌ Frontend web app: it doesn't exist.
-- ❌ Automated tests: there are zero.
-- ❌ CI pipeline: none.
+- ✅ Frontend web app: built (Vite + React, 14 pages).
+- ✅ Automated tests: 69 (`pnpm test`).
+- ✅ CI pipeline: `.github/workflows/ci.yml`.
 - ❌ Production deployment config: there's only a dev `docker-compose` and a `Dockerfile`. Still needed: hosting target, managed Mongo/Redis, secrets management, TLS, backups.
 - ⚠️ `.env.example` is deleted in your working tree, so new developers won't know which variables to set.
 - ⚠️ Booted with `tsx watch` in Docker. Production needs the compiled `pnpm build && pnpm start` image.
@@ -136,7 +136,11 @@ Catalog was the only one blocking your spec, and it is now built.
 5. ~~**Care logs.**~~ **Done (2026-11-05).** Notes, blood pressure, mood and meals per visit, written once by the assigned caregiver after check-in, read by the care circle (`carelog.created` / `carelog.viewed`, family notified). Check-in/out location is now optional (`no_location` flag). Also fixed: visits were never created from confirmed bookings, bookings never learnt their visit before check-in, and care-circle notifications had no recipients.
 6. ~~**Consent & Data Rights module**~~ **Done (2026-11-05).** New `consent-service` at `/v1/privacy`: care-plan sharing consent (enforced on caregivers), "who accessed my data" from the audit log, data download, deletion requests reviewed by an admin (refused while visits are booked; approval erases personal data, keeps visit/care/audit records). Privacy and Data requests pages are live.
 7. ~~**Notifications.**~~ **Done (2026-11-05).** Chain verified automatically every 30 min (a break alerts admins + auditors, critical); policy rules (3+ refusals / 5+ failed sign-ins in 15 min) raise alerts every 2 min; `ml/audit-anomaly/src/live.py alert --run <run>` raises model alerts into the same store; admins and auditors are notified in-app and resolve alerts on the Audit log page. Also fixed: role-wide notifications (e.g. coordinators) had no recipients, and `GET /audit/:sequence` always returned 422.
-8. **Frontend, tests, CI, production deployment.**
+8. **Frontend, tests, CI, production deployment.** Tests and CI **done (2026-11-05)**:
+   - 69 unit tests in `Mzazicare-backend/tests/` (`pnpm test`): HMAC hash chain and checkpoints, append-only store, audit middleware, access control (auditor role, immediate cut-off), and the client address behind a proxy. They need no database.
+   - `.github/workflows/ci.yml` runs on every push: backend typecheck, lint, tests and build; frontend typecheck and build; the seeded anomaly pipeline (simulate, features, train, evaluate) with a quality gate (hybrid F1 at least 0.85, PR-AUC at least 0.90, and better than the baseline). Test reports and ML run evidence are kept per commit as artifacts for 90 days.
+   - `trust proxy` is set from `TRUST_PROXY` (1 in production, 0 otherwise), so the audit log and rate limits see the real client address behind Caddy.
+   - Frontend: built (14 pages). Production deployment: kit ready in `deploy/` (Sprint III).
 
 ### Parked: come back to these after steps 5–7
 - **Coordinator assignment.** A coordinator assigns a caregiver by hand (no auto-matching). It needs an approved caregiver profile to assign.
